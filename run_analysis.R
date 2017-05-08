@@ -20,22 +20,24 @@ x_train <- cbind(x_train,subject_train,y_train)
 all_data <- rbind(x_test,x_train)
 colnames(all_data)[562] <- "subject"
 colnames(all_data)[563] <- "activity_labels"
-
-#Part(2)
-cols_mean_std <- grepl(".*mean.*|.*std.*",colnames(all_data))
-all_data_mean_std <- all_data[,cols_mean_std]
-
-#Part(3)
+#Part(3) adds the activity labels
 all_data <- merge(all_data,activity_labels,by.x = "activity_labels",by.y = "V1")
 colnames(all_data)[564] <- "activity"
+
+#Part(2) selects only those columns which have mean and std measurements
+cols_mean_std <- grepl(".*mean.*|.*std.*",colnames(all_data))
+all_data_mean_std <- all_data[,cols_mean_std]
+new_data <- all_data_mean_std
+
+new_data$activity <- all_data$activity
+new_data$subject <- all_data$subject
+
 #Part(5)
 library(dplyr)
 library(reshape2)
-tidy_data <- melt(all_data,id.vars = c("subject","activity"),measure.vars = colnames(all_data)[c(-563,-564)])
-colnames(tidy_data)
-tail(tidy_data)
+
+tidy_data <- melt(new_data,id.vars = c("subject","activity"))
 
 tidy_data <- tidy_data %>% group_by(subject,activity,variable) %>% summarise(mean = mean(value))
-str(tidy_data)
 
-write.csv(tidy_data,"tidy.csv")
+write.table(tidy_data,"tidy.txt",row.names = F)
