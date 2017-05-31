@@ -1,0 +1,97 @@
+---
+title: "course project"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R HTML document for machine learning course project.This document describes the methods used for analysis and building model
+Reading the train data into 
+
+```{r train}
+train <- read.csv("pml-training.csv")
+summary(train)
+
+```
+From summary we can see that Data has lot of NAs.
+All variables either have 19216 NAs or none.Since the number of NAs in the variables is quite high,it's better to remove these variables.
+Na_count calculates the count of NAs in each variable 
+```{r}
+NA_count <- apply(train,2,function(x){sum(is.na(x))})
+
+```
+subsetting the train data with variables which have no NAs
+```{r}
+
+train_clean <- train[, names(which(NA_count < 19216))]
+```
+Removing variables that will not be used in model building
+```{r}
+train_clean$user_name <- NULL
+train_clean$raw_timestamp_part_1 <- NULL
+train_clean$raw_timestamp_part_2 <- NULL
+train_clean$cvtd_timestamp <- NULL
+train_clean$X <- NULL
+train_clean$new_window <- NULL
+
+```
+Loading library caret and boruta 
+Boruta selects the important variables by building random forest models
+It works as a wrapper algorithm around Random Forest by creating shuffled copies of variables.</p>
+```{r}
+library(caret) 
+library(Boruta)
+boruta.train <- Boruta(classe~.,data = train_clean,doTrace = 2,maxRuns = 15)
+final_boruta <- TentativeRoughFix(boruta.train)
+features <- getSelectedAttributes(final_boruta)
+final_train <- train_clean[,features]
+final_train$classe <- train_clean$classe
+
+```
+Partitioning data into training and validation data sets
+```{r}
+
+intrain <- createDataPartition(final_train$classe,p = 0.7,list = F)
+new_train <- final_train[intrain,]
+validation <- final_train[-intrain,] 
+```
+
+Loading random forest library
+Building Random forest model and predicting it on the validation set.
+```{r}
+
+library(randomForest)
+mod3 <- randomForest(classe~.,data = new_train)
+pred3 <- predict(mod3,newdata = validation)
+confusionMatrix(validation$classe,pred3)
+```
+
+Accuracy on validation set is quite good(0.997)
+We can try to improve accuracy further by doing cross-validation
+Doing 5 fold Cross Validation
+
+```{r}
+
+trcon <- trainControl(method = "cv",number = 5,search = "random")
+rf_CV <- train(classe~.,data = new_train,method = "rf",trControl = trcon)
+mod_cv <- randomForest(classe~.,data = new_train,mtry = 40)
+```
+
+Now predicting the cV model on validation set.
+```{r}
+
+pred_cv <- predict(mod_cv,newdata = validation)
+ confusionMatrix(validation$classe,pred_cv)
+```
+The cross validated model has more or less the same accuracy as the previous model
+Reading the test set in R and Predicting the cross validated model on test set
+```{r}
+
+ test <- read.csv("pml-testing.csv")
+test_pred <- predict(mod_cv,newdata = test)
+```
+
